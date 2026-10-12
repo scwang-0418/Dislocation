@@ -1,0 +1,798 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>差排互動實驗室</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: monochrome instrument UI (ink on steel) so that color is reserved for physics:
+   red = dislocation line, blue = Burgers vector, green = slip plane, violet = circuit / motion, amber = distortion */
+:root{
+  --bg:#EEF0F3; --panel:#FFFFFF; --ink:#161B24; --muted:#5A6474; --rule:#D5DAE1; --chip:#E4E8EE;
+  --stage:#F8F9FB; --atom:#A3ABB7; --atom-low:#6E7785; --bond:#8C96A4; --distort:#E07A12;
+  --line:#D0312D; --bvec:#1F5FD1; --bcomp:#7EA6EE; --plane:#2F9A5A; --circuit:#7C3AED;
+  --block-top:#EDA86C; --block-side:#FBE0C2; --block-grid:#8A5A32;
+  --ok:#1E8A4C; --bad:#C2352B;
+  --f-display:"Noto Serif TC","Songti TC",serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1116; --panel:#161B22; --ink:#E8ECF2; --muted:#97A1B0; --rule:#2A313B; --chip:#222A34;
+  --stage:#0B0E12; --atom:#8B95A3; --atom-low:#566070; --bond:#5C6674; --distort:#F29A38;
+  --line:#FF5A4E; --bvec:#5A9BFF; --bcomp:#3D6BB8; --plane:#43C17A; --circuit:#A98BFF;
+  --block-top:#B9773F; --block-side:#7A5A3E; --block-grid:#2B1A0D;
+  --ok:#4CC27E; --bad:#FF6B5E; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0E1116; --panel:#161B22; --ink:#E8ECF2; --muted:#97A1B0; --rule:#2A313B; --chip:#222A34;
+  --stage:#0B0E12; --atom:#8B95A3; --atom-low:#566070; --bond:#5C6674; --distort:#F29A38;
+  --line:#FF5A4E; --bvec:#5A9BFF; --bcomp:#3D6BB8; --plane:#43C17A; --circuit:#A98BFF;
+  --block-top:#B9773F; --block-side:#7A5A3E; --block-grid:#2B1A0D;
+  --ok:#4CC27E; --bad:#FF6B5E; color-scheme:dark;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.65;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2,h3{text-wrap:balance;margin:0;line-height:1.3}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(28px,4.4vw,42px);letter-spacing:.02em}
+h2{font-family:var(--f-display);font-size:clamp(22px,2.8vw,28px)}
+h3{font-size:18px}
+p{margin:0}
+.eyebrow{font-size:13px;letter-spacing:.12em;color:var(--muted);font-weight:500}
+.mono{font-family:var(--f-mono);font-size:.92em}
+.ob{text-decoration:overline}
+header{display:flex;flex-direction:column;gap:8px}
+header .lead{color:var(--muted);max-width:62ch}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+/* type tabs */
+.types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.type-btn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--panel);border:1.5px solid var(--rule);border-radius:var(--r);padding:12px 14px;transition:border-color .15s,background .15s}
+.type-btn b{font-size:17px}
+.type-btn span{font-size:13px;color:var(--muted)}
+.type-btn .rel{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.type-btn:hover{border-color:var(--muted)}
+.type-btn[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.type-btn[aria-pressed="true"] span,.type-btn[aria-pressed="true"] .rel{color:var(--panel);opacity:.8}
+
+/* workbench */
+.bench{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:16px;align-items:start}
+@media (max-width:920px){.bench{grid-template-columns:minmax(0,1fr)}}
+.stage{display:flex;flex-direction:column;gap:10px;min-width:0}
+.viewport{position:relative;height:clamp(380px,64vh,640px);background:var(--stage);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden;touch-action:none}
+.viewport canvas{display:block;width:100%;height:100%}
+.vp-hint{position:absolute;right:10px;bottom:8px;font-size:12px;color:var(--muted);pointer-events:none}
+.vp-tag{position:absolute;left:12px;top:10px;font-size:13px;font-weight:700;background:var(--panel);border:1px solid var(--rule);padding:3px 10px;border-radius:999px}
+.bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.seg{display:inline-flex;flex-wrap:wrap;background:var(--chip);border-radius:8px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;padding:5px 10px;border-radius:6px;font-size:14px;position:relative}
+.seg button[aria-pressed="true"]{background:var(--panel);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.seg button.rec::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--plane)}
+.toggles{display:flex;flex-wrap:wrap;gap:12px;font-size:14px}
+.toggles label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.legend i.dot{width:10px;height:10px;border-radius:50%}
+.small{font-size:13px;color:var(--muted)}
+
+/* panel */
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r);display:flex;flex-direction:column;min-width:0}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--rule)}
+.modes button{border:0;background:transparent;padding:12px 4px;font-size:15px;border-bottom:3px solid transparent;color:var(--muted)}
+.modes button[aria-pressed="true"]{color:var(--ink);font-weight:700;border-bottom-color:var(--ink)}
+.pane{padding:16px;display:flex;flex-direction:column;gap:12px}
+.pane p{font-size:15px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1.5px solid var(--rule);background:var(--panel);border-radius:8px;padding:7px 12px;font-size:14px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--ink);color:var(--panel);border-color:var(--ink);font-weight:700}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.status{background:var(--chip);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.6;min-height:3.2em}
+.status b{font-weight:700}
+.range{display:flex;flex-direction:column;gap:4px;font-size:14px}
+.range .row{display:flex;justify-content:space-between}
+input[type=range]{width:100%;accent-color:var(--ink)}
+.comp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.comp div{background:var(--chip);border-radius:8px;padding:8px 10px;font-size:13px}
+.comp b{display:block;font-family:var(--f-mono);font-size:16px}
+.readout{border-top:1px solid var(--rule);padding:14px 16px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;font-size:14px}
+.readout dt{color:var(--muted)}
+.readout dd{margin:0;font-weight:500}
+.note{font-size:12.5px;color:var(--muted);line-height:1.6}
+
+/* guide */
+.guide{position:absolute;left:12px;bottom:12px;max-width:min(320px,calc(100% - 24px));background:var(--panel);border:1px solid var(--rule);border-radius:var(--r);padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:8px;font-size:14px}
+.guide .step{font-size:12px;color:var(--muted);letter-spacing:.08em}
+
+/* sections */
+section.block{display:flex;flex-direction:column;gap:14px}
+section.block > p{max-width:70ch;color:var(--muted)}
+.why{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:760px){.why{grid-template-columns:minmax(0,1fr)}}
+.why figure{margin:0;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.why figcaption{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}
+.why canvas{width:100%;display:block}
+.meter{height:10px;background:var(--chip);border-radius:5px;overflow:hidden}
+.meter span{display:block;height:100%;background:var(--distort);width:0;transition:width .1s}
+.analogy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:760px){.analogy{grid-template-columns:minmax(0,1fr)}}
+.analogy div{border-left:3px solid var(--rule);padding:2px 0 2px 12px;font-size:15px}
+
+.tablewrap{overflow-x:auto;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:15px}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--rule)}
+thead th{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:.04em}
+tbody th{font-weight:500;color:var(--muted)}
+tbody tr:last-child>*{border-bottom:0}
+
+details{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r)}
+summary{cursor:pointer;padding:14px 16px;font-weight:700;font-size:16px}
+.ext{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:0 16px 16px}
+@media (max-width:760px){.ext{grid-template-columns:minmax(0,1fr)}}
+.ext div{display:flex;flex-direction:column;gap:6px;font-size:14.5px}
+.ext svg{width:100%;height:auto;background:var(--stage);border-radius:8px}
+
+.quiz{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;max-width:760px}
+.quiz .qhead{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.quiz .qtext{font-size:17px;font-weight:500}
+.quiz svg{width:100%;max-width:420px;height:auto;background:var(--stage);border-radius:8px}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.opts{grid-template-columns:minmax(0,1fr)}}
+.opt{text-align:left;border:1.5px solid var(--rule);background:var(--panel);border-radius:8px;padding:10px 12px;font-size:15px}
+.opt:hover:not([disabled]){border-color:var(--muted)}
+.opt.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--panel))}
+.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--panel))}
+.opt[disabled]{cursor:default}
+.explain{font-size:15px;border-left:3px solid var(--ink);padding-left:12px}
+.explain b.ok{color:var(--ok)} .explain b.no{color:var(--bad)}
+footer{font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">材料導論・晶體缺陷 ／ 線缺陷</div>
+  <h1>差排互動實驗室</h1>
+  <p class="lead">選一種差排，觀察它的布格向量 <b>b</b>、差排線 <b>ξ</b>，再施加剪應力，看差排如何在滑移面上移動並讓晶體產生塑性變形。晶格為簡單立方，原子間距 a = 1。</p>
+</header>
+
+<nav class="types" aria-label="差排種類">
+  <button class="type-btn" data-type="edge" aria-pressed="true"><b>刃差排</b><span>Edge dislocation</span><span class="rel">b ⊥ ξ</span></button>
+  <button class="type-btn" data-type="screw" aria-pressed="false"><b>螺旋差排</b><span>Screw dislocation</span><span class="rel">b ∥ ξ</span></button>
+  <button class="type-btn" data-type="mixed" aria-pressed="false"><b>混合差排</b><span>Mixed dislocation</span><span class="rel">0° &lt; θ &lt; 90°</span></button>
+</nav>
+
+<div class="bench">
+  <div class="stage">
+    <div class="viewport" id="viewport">
+      <div class="vp-tag" id="vpTag">刃差排・結構</div>
+      <div class="vp-hint" id="vpHint">拖曳旋轉・滾輪或雙指縮放・右鍵拖曳平移</div>
+      <div class="guide" id="guide" hidden>
+        <div class="step" id="gStep">導覽 1 / 3</div>
+        <div id="gText"></div>
+        <div class="btns"><button class="btn primary" id="gNext">下一步</button><button class="btn" id="gSkip">略過</button></div>
+      </div>
+    </div>
+    <div class="bar">
+      <div class="seg" role="group" aria-label="視角" id="views">
+        <button data-view="3d" aria-pressed="true">3D 立體</button>
+        <button data-view="front" aria-pressed="false">正視 (xy)</button>
+        <button data-view="side" aria-pressed="false">側視 (yz)</button>
+        <button data-view="top" aria-pressed="false">俯視滑移面</button>
+      </div>
+      <button class="btn" id="resetView">重設視角</button>
+    </div>
+    <div class="bar">
+      <div class="toggles">
+        <label><input type="checkbox" id="tAtoms" checked> 原子</label>
+        <label><input type="checkbox" id="tBonds" checked> 鍵結</label>
+        <label><input type="checkbox" id="tPlane" checked> 滑移面</label>
+        <label><input type="checkbox" id="tSurf"> 只顯示表面原子</label>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--atom)"></i>原子</span>
+        <span><i class="dot" style="background:var(--distort)"></i>扭曲大的原子</span>
+        <span><i style="background:var(--line)"></i>差排線 ξ</span>
+        <span><i style="background:var(--bvec)"></i>布格向量 b</span>
+        <span><i style="background:var(--plane)"></i>滑移面</span>
+        <span><i style="background:var(--circuit)"></i>迴路／移動方向</span>
+      </div>
+    </div>
+    <p class="small" id="viewNote">綠點標示「沿差排線看進去」的建議剖面。</p>
+  </div>
+
+  <aside class="panel">
+    <div class="modes" role="group" aria-label="學習模式">
+      <button data-mode="structure" aria-pressed="true">結構</button>
+      <button data-mode="circuit" aria-pressed="false">布格迴路</button>
+      <button data-mode="slip" aria-pressed="false">滑移模擬</button>
+    </div>
+
+    <div class="pane" id="pane-structure">
+      <h3 id="sTitle">刃差排 Edge dislocation</h3>
+      <p id="sText"></p>
+      <div id="mixedCtl" hidden>
+        <div class="seg" role="group" aria-label="差排線形狀" id="shapes">
+          <button data-shape="curved" aria-pressed="true">彎曲差排線</button>
+          <button data-shape="straight" aria-pressed="false">直線＋夾角 θ</button>
+        </div>
+        <div id="thetaCtl" hidden style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <div class="range"><div class="row"><span>b 與 ξ 的夾角 θ</span><b class="mono" id="thetaVal">45°</b></div>
+            <input type="range" id="theta" min="0" max="90" step="5" value="45"></div>
+          <div class="comp">
+            <div>刃分量 b·sin θ<b id="cEdge">0.71 b</b></div>
+            <div>螺旋分量 b·cos θ<b id="cScrew">0.71 b</b></div>
+          </div>
+          <label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="tComp" checked> 在圖上顯示兩個分量（淺藍）</label>
+        </div>
+      </div>
+      <button class="btn" id="recView">切換到建議剖面</button>
+    </div>
+
+    <div class="pane" id="pane-circuit" hidden>
+      <h3>布格迴路 Burgers circuit</h3>
+      <div id="circOK">
+        <p>在晶體中逐格走一圈。先在完美晶體走，再到含差排的晶體走<b>同樣的步數</b>，看看會不會回到起點。</p>
+        <div class="btns" style="margin-top:10px">
+          <button class="btn" id="cPerfect" aria-pressed="true">① 完美晶體</button>
+          <button class="btn" id="cReal" aria-pressed="false">② 含差排晶體</button>
+        </div>
+        <div class="btns" style="margin-top:8px">
+          <button class="btn primary" id="cStep">下一步</button>
+          <button class="btn" id="cAuto">自動播放</button>
+          <button class="btn" id="cReset">重來</button>
+        </div>
+        <div class="status" id="cStatus" style="margin-top:10px"></div>
+        <p class="note" style="margin-top:8px">本程式慣例：右手拇指指向 ξ，四指彎曲方向就是繞行方向；在含差排晶體中，由終點 F 指向起點 S 的向量定義為 b。不同教科書的正負號慣例可能相反，但 b 的大小與方位相同。</p>
+      </div>
+      <div id="circMixed" hidden>
+        <p>混合差排的 b 和刃差排、螺旋差排完全相同，只是差排線方向不同。布格迴路的概念用純刃型或純螺旋型最容易看清楚。</p>
+        <div class="btns"><button class="btn" data-goto="edge">看刃差排的迴路</button><button class="btn" data-goto="screw">看螺旋差排的迴路</button></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-slip" hidden>
+      <h3>施加剪應力 τ</h3>
+      <p id="slipText"></p>
+      <div class="btns">
+        <button class="btn primary" id="pPlay">▶ 播放</button>
+        <button class="btn" id="pStep">單步</button>
+        <button class="btn" id="pReset">重設</button>
+      </div>
+      <div class="range"><div class="row"><span>進度</span><b class="mono" id="progVal">0%</b></div>
+        <input type="range" id="prog" min="0" max="1000" value="0"></div>
+      <div class="range"><div class="row"><span>速度</span><b class="mono" id="speedVal">1.0×</b></div>
+        <input type="range" id="speed" min="0.25" max="2" step="0.25" value="1"></div>
+      <div class="status" id="pStatus"></div>
+    </div>
+
+    <dl class="readout" id="readout"></dl>
+  </aside>
+</div>
+
+<section class="block" id="why">
+  <div class="eyebrow">觀念 ①</div>
+  <h2>為什麼需要差排？</h2>
+  <p>如果要讓晶體上半部整片一起滑過下半部，介面上所有原子鍵必須同時被拉開，需要的剪應力非常大（理論剪強度約 G/2π）。實際金屬單晶的臨界分解剪應力，常只有理論值的千分之一甚至更小，原因就是差排：它讓原子鍵一次只斷開一排。</p>
+  <div class="why">
+    <figure>
+      <figcaption><b>整片一起滑動</b><span class="small">同時扭曲的鍵：<b class="mono" id="wA">0</b> 條</span></figcaption>
+      <canvas id="whyA" height="230"></canvas>
+      <div class="meter" aria-label="所需剪應力示意"><span id="mA"></span></div>
+      <span class="small">橘色條：需要施加的力（示意）</span>
+    </figure>
+    <figure>
+      <figcaption><b>靠差排逐排滑動</b><span class="small">同時扭曲的鍵：<b class="mono" id="wB">0</b> 條</span></figcaption>
+      <canvas id="whyB" height="230"></canvas>
+      <div class="meter"><span id="mB"></span></div>
+      <span class="small">兩者最後都滑移了一個原子間距 b</span>
+    </figure>
+  </div>
+  <div class="bar">
+    <button class="btn primary" id="wPlay">❚❚ 暫停</button>
+    <div class="range" style="flex:1;min-width:200px"><input type="range" id="wProg" min="0" max="1000" value="450" aria-label="動畫進度"></div>
+  </div>
+  <div class="analogy">
+    <div><b>推地毯上的皺褶</b><br>要把整張大地毯拖動一點很費力；先在一端做出一個皺褶，再把皺褶推到另一端，就能輕鬆讓地毯整體移動一段距離。皺褶就像差排。</div>
+    <div><b>毛毛蟲爬行</b><br>毛毛蟲不會整個身體同時離地，而是一次只抬起一小段，讓這個「隆起」從尾端傳到頭部。差排在滑移面上移動也是一次只動一排原子。</div>
+  </div>
+</section>
+
+<section class="block" id="compare">
+  <div class="eyebrow">觀念 ②</div>
+  <h2>三種差排比較</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>項目</th><th>刃差排</th><th>螺旋差排</th><th>混合差排</th></tr></thead>
+    <tbody>
+      <tr><th>b 與差排線的關係</th><td>垂直</td><td>平行</td><td>介於兩者之間</td></tr>
+      <tr><th>差排線移動方向與 b 的關係</th><td>平行</td><td>垂直</td><td>介於兩者之間</td></tr>
+      <tr><th>滑移面</th><td>唯一（由 b 和 ξ 決定）</td><td>不唯一，可交滑移</td><td>唯一</td></tr>
+      <tr><th>晶格畸變的樣子</th><td>多插入半片原子面</td><td>原子面呈螺旋坡道</td><td>兩種特徵兼具</td></tr>
+      <tr><th>最後造成的滑移量</th><td colspan="3">都等於 b（上半晶體相對下半晶體錯開一個 b）</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="block">
+  <details>
+    <summary>延伸閱讀：差排與金屬的強化機制</summary>
+    <p style="padding:0 16px 12px;color:var(--muted);font-size:15px">金屬會降伏是因為差排在動。想讓金屬更強，就要想辦法<b>阻礙差排移動</b>。</p>
+    <div class="ext">
+      <div><svg viewBox="0 0 200 110" aria-label="差排糾結示意">
+        <path d="M10 30 C60 10 90 70 190 40" fill="none" stroke="var(--line)" stroke-width="2.5"/>
+        <path d="M20 90 C70 40 120 100 180 20" fill="none" stroke="var(--line)" stroke-width="2.5"/>
+        <path d="M15 60 C80 80 120 20 190 80" fill="none" stroke="var(--line)" stroke-width="2.5"/>
+        <path d="M60 10 C70 50 50 80 90 105" fill="none" stroke="var(--line)" stroke-width="2.5"/>
+        <path d="M140 8 C120 40 160 70 130 104" fill="none" stroke="var(--line)" stroke-width="2.5"/></svg>
+        <b>加工硬化</b><span>冷加工讓差排數量大增，差排彼此糾結、互相卡住，越變形越難變形。</span></div>
+      <div><svg viewBox="0 0 200 110" aria-label="晶界阻擋差排示意">
+        <path d="M120 0 L135 110" stroke="var(--ink)" stroke-width="2.5" fill="none"/>
+        <g stroke="var(--line)" stroke-width="2.5" fill="none">
+          <path d="M100 48 h14 M107 48 v-14"/><path d="M76 52 h14 M83 52 v-14"/><path d="M48 56 h14 M55 56 v-14"/><path d="M14 60 h14 M21 60 v-14"/></g>
+        <path d="M10 66 L118 56" stroke="var(--plane)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="148" y="60" font-size="12" fill="var(--muted)">晶界</text></svg>
+        <b>晶界強化（細晶強化）</b><span>晶界兩側滑移面方向不同，差排會堆積在晶界前。晶粒越細，晶界越多，強度越高。</span></div>
+      <div><svg viewBox="0 0 200 110" aria-label="固溶原子示意">
+        <g fill="var(--atom)">
+          <circle cx="30" cy="25" r="8"/><circle cx="60" cy="25" r="8"/><circle cx="90" cy="25" r="8"/><circle cx="120" cy="25" r="8"/><circle cx="150" cy="25" r="8"/><circle cx="180" cy="25" r="8"/>
+          <circle cx="30" cy="55" r="8"/><circle cx="60" cy="55" r="8"/><circle cx="120" cy="55" r="8"/><circle cx="150" cy="55" r="8"/><circle cx="180" cy="55" r="8"/>
+          <circle cx="30" cy="85" r="8"/><circle cx="60" cy="85" r="8"/><circle cx="90" cy="85" r="8"/><circle cx="120" cy="85" r="8"/><circle cx="150" cy="85" r="8"/><circle cx="180" cy="85" r="8"/></g>
+        <circle cx="90" cy="55" r="12" fill="var(--distort)"/>
+        <g stroke="var(--line)" stroke-width="2.5"><path d="M128 72 h16 M136 72 v-16"/></g></svg>
+        <b>固溶強化</b><span>大小不同的溶質原子使周圍晶格扭曲，形成應力場，差排經過時需要更大的力。</span></div>
+    </div>
+  </details>
+</section>
+
+<section class="block" id="quizSec">
+  <div class="eyebrow">自我檢測</div>
+  <h2>小測驗</h2>
+  <div class="quiz" id="quiz"></div>
+</section>
+
+<footer>簡化模型：位移場採用等向彈性解的滑移分量 u = (b/2π)·atan2(y, s)，忽略垂直滑移面的小位移；僅供教學示意。</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const root=document.documentElement;
+const cssv=n=>getComputedStyle(root).getPropertyValue(n).trim();
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+/* ---------- lattice ---------- */
+const NX=10,NY=6,NZ=8,N=NX*NY*NZ,BX=NX/2,BZ=NZ/2,JL=NY/2-1,JU=NY/2;
+const id=(i,j,k)=>(i*NY+j)*NZ+k;
+const ref=new Float32Array(N*3),pos=new Float32Array((N+(NY/2)*NZ)*3),IJK=new Array(N);
+for(let i=0;i<NX;i++)for(let j=0;j<NY;j++)for(let k=0;k<NZ;k++){const n=id(i,j,k);ref[3*n]=i-(NX-1)/2;ref[3*n+1]=j-(NY-1)/2;ref[3*n+2]=k-(NZ-1)/2;IJK[n]=[i,j,k];}
+const EX=(NY-JU)*NZ,M=N+EX,HX=NX/2;
+const exId=(j,k)=>N+(j-JU)*NZ+k;
+const fixedBonds=[];
+for(let i=0;i<NX;i++)for(let j=0;j<NY;j++)for(let k=0;k<NZ;k++){const n=id(i,j,k);
+  if(i<NX-1)fixedBonds.push([n,id(i+1,j,k)]);if(k<NZ-1)fixedBonds.push([n,id(i,j,k+1)]);if(j<NY-1&&j!==JL)fixedBonds.push([n,id(i,j+1,k)]);}
+
+/* extra half-plane (edge structure / circuit): upper half has NX+1 columns, column HX is the inserted plane */
+const REF=new Float32Array(M*3);REF.set(ref);
+for(let j=JU;j<NY;j++)for(let k=0;k<NZ;k++){const n=exId(j,k);REF[3*n]=0;REF[3*n+1]=j-(NY-1)/2;REF[3*n+2]=k-(NZ-1)/2;IJK[n]=[-1,j,k];}
+const colId=(c,j,k)=>c===HX?exId(j,k):id(c<HX?c:c-1,j,k);
+const insBonds=[];
+for(let j=0;j<NY;j++)for(let k=0;k<NZ;k++){
+  if(j<JU){for(let i=0;i<NX;i++){const n=id(i,j,k);if(i<NX-1)insBonds.push([n,id(i+1,j,k)]);if(k<NZ-1)insBonds.push([n,id(i,j,k+1)]);if(j<JL)insBonds.push([n,id(i,j+1,k)]);}}
+  else{for(let c=0;c<=NX;c++){const n=colId(c,j,k);if(c<NX)insBonds.push([n,colId(c+1,j,k)]);if(k<NZ-1)insBonds.push([n,colId(c,j,k+1)]);if(j<NY-1)insBonds.push([n,colId(c,j+1,k)]);}}}
+/* ---------- state ---------- */
+const st={surf:false,surfTouched:false,style:'atoms',styleTouched:false,type:'edge',shape:'curved',theta:45,mode:'structure',view:'3d',f:1,fTarget:1,slip:0,playing:false,speed:1,atoms:true,bonds:true,plane:true,comp:true};
+let dirty=true;
+const ARC_C={x:-BX,z:BZ};
+const isArc=()=>st.type==='mixed'&&st.shape==='curved';
+const thetaDeg=()=>st.type==='edge'?90:st.type==='screw'?0:st.theta;
+function geom(){
+  if(isArc())return{arc:true,R:st.mode==='slip'?-1.5+st.slip*16:6.5};
+  if(st.type==='screw'){const m={x:0,z:-1};let d=0;if(st.mode==='slip'){const D=BZ+3.5;d=-D+2*D*st.slip;}
+    return{arc:false,screw:true,m,xi:{x:-1,z:0},p:{x:0,z:-d},th:0};}
+  const th=thetaDeg()*Math.PI/180,m={x:Math.sin(th),z:Math.cos(th)},xi={x:Math.cos(th),z:-Math.sin(th)};
+  let d=0;if(st.mode==='slip'){const D=BX*Math.abs(m.x)+BZ*Math.abs(m.z)+3.5;d=-D+2*D*st.slip;}
+  return{arc:false,m,xi,p:{x:m.x*d,z:m.z*d},th};
+}
+function sdist(g,x,z){return g.arc?Math.hypot(x-ARC_C.x,z-ARC_C.z)-g.R:(x-g.p.x)*g.m.x+(z-g.p.z)*g.m.z;}
+const insertMode=()=>st.type==='edge'&&st.mode!=='slip';
+const uIns=(x,y)=>-Math.sign(y)*Math.atan(x/Math.abs(y))/(2*Math.PI);
+function computeInto(arr,f){
+  if(insertMode()){for(let n=0;n<M;n++){const y=REF[3*n+1],z=REF[3*n+2];let x0,x1;
+      if(n>=N){x0=x1=0;}else{const i=IJK[n][0],j=IJK[n][1];x0=REF[3*n];const xr=j>=JU?(i<HX?i:i+1)-HX:x0;x1=xr+uIns(xr,y);}
+      arr[3*n]=x0+(x1-x0)*f;arr[3*n+1]=y;arr[3*n+2]=z;}return;}
+  for(let n=N;n<M;n++){arr[3*n]=0;arr[3*n+1]=REF[3*n+1];arr[3*n+2]=REF[3*n+2];}
+  const g=geom();
+  if(g.screw){for(let n=0;n<N;n++){const x=ref[3*n],y=ref[3*n+1],z=ref[3*n+2];let u=0;
+      if(y>0){const w=.55+.45*(y-.5);u=.5-Math.atan(sdist(g,x,z)/w)/Math.PI;}
+      arr[3*n]=x+f*u;arr[3*n+1]=y;arr[3*n+2]=z;}return;}
+  for(let n=0;n<N;n++){const x=ref[3*n],y=ref[3*n+1],z=ref[3*n+2];arr[3*n]=x+f*Math.atan2(y,sdist(g,x,z))/(2*Math.PI);arr[3*n+1]=y;arr[3*n+2]=z;}}
+
+/* ---------- three setup ---------- */
+const vp=$('#viewport');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+vp.insertBefore(renderer.domElement,vp.firstChild);
+const scene=new THREE.Scene();
+const persp=new THREE.PerspectiveCamera(40,1,0.1,200);
+const ortho=new THREE.OrthographicCamera(-6,6,4,-4,0.1,200);
+let cam=persp,controls=null;
+scene.add(new THREE.HemisphereLight(0xffffff,0x667080,0.75));
+const dl=new THREE.DirectionalLight(0xffffff,0.75);dl.position.set(6,12,9);scene.add(dl);
+const V3=THREE.Vector3,UP=new V3(0,1,0);
+
+const sphere=new THREE.SphereGeometry(1,18,14);
+const atomMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.55,metalness:.08});
+const atomMesh=new THREE.InstancedMesh(sphere,atomMat,M);scene.add(atomMesh);
+const dummy=new THREE.Object3D(),tmpC=new THREE.Color(),cA=new THREE.Color(),cL=new THREE.Color(),cD=new THREE.Color();
+for(let n=0;n<M;n++)atomMesh.setColorAt(n,cA);
+const maxSeg=Math.max(fixedBonds.length,insBonds.length)+NX*NZ;
+const bondPos=new Float32Array(maxSeg*6);
+const bondGeo=new THREE.BufferGeometry();bondGeo.setAttribute('position',new THREE.BufferAttribute(bondPos,3));
+const bondMat=new THREE.LineBasicMaterial({color:0x888888,transparent:true,opacity:.65});
+const bonds=new THREE.LineSegments(bondGeo,bondMat);bonds.frustumCulled=false;scene.add(bonds);
+
+const planeMat=new THREE.MeshBasicMaterial({color:0x2f9a5a,transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false});
+const plane=new THREE.Mesh(new THREE.PlaneGeometry(NX+.6,NZ+.6),planeMat);plane.rotation.x=-Math.PI/2;scene.add(plane);
+const planeEdge=new THREE.LineSegments(new THREE.EdgesGeometry(plane.geometry),new THREE.LineBasicMaterial({color:0x2f9a5a}));planeEdge.rotation.x=-Math.PI/2;scene.add(planeEdge);
+
+const lineMat=new THREE.MeshStandardMaterial({color:0xd0312d,roughness:.4,emissive:0x000000});
+let tube=new THREE.Mesh(new THREE.BufferGeometry(),lineMat);tube.renderOrder=12;scene.add(tube);
+/* ---------- block (textbook) model: each half crystal drawn as a deformed solid grid ---------- */
+const matTop=new THREE.MeshBasicMaterial({color:0xe9a66b,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+const matSide=new THREE.MeshBasicMaterial({color:0xf8d9b8,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1});
+const gridMat=new THREE.LineBasicMaterial({color:0x8a5a32,transparent:true,opacity:.6});
+const blockCache={};
+function makeBlock(nc,nr,nz){
+  const keys=[],idx=[],segs=[],groups=[];const faces=[];
+  faces.push(['r',0],['r',nr-1],['c',0],['c',nc-1],['k',0],['k',nz-1]);
+  let gStart=0;
+  faces.forEach(([ax,val],fi)=>{const dims=ax==='c'?[nr,nz]:ax==='r'?[nc,nz]:[nc,nr];const base=keys.length;
+    for(let a=0;a<dims[0];a++)for(let b=0;b<dims[1];b++){keys.push(ax==='c'?[val,a,b]:ax==='r'?[a,val,b]:[a,b,val]);}
+    const V=(a,b)=>base+a*dims[1]+b;
+    for(let a=0;a<dims[0];a++)for(let b=0;b<dims[1];b++){if(a<dims[0]-1&&b<dims[1]-1)idx.push(V(a,b),V(a+1,b),V(a+1,b+1),V(a,b),V(a+1,b+1),V(a,b+1));
+      if(a<dims[0]-1)segs.push(V(a,b),V(a+1,b));if(b<dims[1]-1)segs.push(V(a,b),V(a,b+1));}
+    if(fi===1){groups.push([0,idx.length,0]);gStart=idx.length;}});
+  groups.push([gStart,idx.length-gStart,1]);
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(keys.length*3),3));geo.setIndex(idx);
+  groups.forEach(g=>geo.addGroup(...g));
+  const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(segs.length*3),3));
+  return{keys,segs,geo,lg};}
+const blocks=[0,1].map(()=>{const m=new THREE.Mesh(new THREE.BufferGeometry(),[matTop,matSide]);const l=new THREE.LineSegments(new THREE.BufferGeometry(),gridMat);l.frustumCulled=false;m.frustumCulled=false;scene.add(m,l);return{m,l,key:''};});
+function updateBlocks(on){blocks.forEach(b=>{b.m.visible=b.l.visible=on;});if(!on)return;
+  const ins=insertMode()&&st.f>=.5;
+  [false,true].forEach((upper,bi)=>{const nc=upper&&ins?NX+1:NX,nr=upper?NY-JU+1:JL+2,key=(upper?'u':'l')+nc+'-'+nr;
+    if(!blockCache[key])blockCache[key]=makeBlock(nc,nr,NZ);const B=blockCache[key],o=blocks[bi];
+    if(o.key!==key){o.m.geometry=B.geo;o.l.geometry=B.lg;o.key=key;}
+    const P=B.geo.attributes.position.array;
+    B.keys.forEach(([c,r,k],v)=>{let j,plane=false;
+      if(upper){if(r===0){plane=true;j=JU;}else j=JU+r-1;}else{if(r===JL+1){plane=true;j=JL;}else j=r;}
+      const n=upper&&ins?colId(c,j,k):id(c,j,k);P[3*v]=pos[3*n];P[3*v+1]=plane?0:pos[3*n+1];P[3*v+2]=pos[3*n+2];});
+    B.geo.attributes.position.needsUpdate=true;B.geo.computeVertexNormals();B.geo.computeBoundingSphere();
+    const L=B.lg.attributes.position.array;for(let q=0;q<B.segs.length;q++){const v=B.segs[q];L[3*q]=P[3*v];L[3*q+1]=P[3*v+1];L[3*q+2]=P[3*v+2];}
+    B.lg.attributes.position.needsUpdate=true;});}
+
+const coneGeo=new THREE.ConeGeometry(1,1,18),cylGeo=new THREE.CylinderGeometry(1,1,1,12);
+const xiCones=[];for(let c=0;c<5;c++){const m=new THREE.Mesh(coneGeo,lineMat);m.scale.set(.17,.42,.17);scene.add(m);xiCones.push(m);}
+
+const arrows=[];
+function mkArrow(cv,r=.055,op=1){const mat=new THREE.MeshBasicMaterial({color:0xffffff,depthTest:false,transparent:true,opacity:op});
+  const s=new THREE.Mesh(cylGeo,mat),h=new THREE.Mesh(coneGeo,mat);s.renderOrder=h.renderOrder=15;
+  const g=new THREE.Group();g.add(s,h);g.userData={cv,mat,s,h,r};scene.add(g);arrows.push(g);return g;}
+function setArrow(a,o,v){const L=v.length();if(L<1e-3){a.visible=false;return;}a.visible=true;
+  const d=v.clone().normalize(),hl=Math.min(.36,L*.45),r=a.userData.r;a.position.copy(o);a.quaternion.setFromUnitVectors(UP,d);
+  a.userData.s.scale.set(r,L-hl,r);a.userData.s.position.set(0,(L-hl)/2,0);a.userData.h.scale.set(r*3.3,hl,r*3.3);a.userData.h.position.set(0,L-hl/2,0);}
+const bArrow=mkArrow('--bvec',.06),bE=mkArrow('--bcomp',.045,.95),bS=mkArrow('--bcomp',.045,.95);
+const arcB=[mkArrow('--bvec',.055),mkArrow('--bvec',.055),mkArrow('--bvec',.055)];
+const moveArrow=mkArrow('--circuit',.06);
+const tauTop=mkArrow('--ink',.06),tauBot=mkArrow('--ink',.06);
+const closeArrow=mkArrow('--bvec',.08);
+
+const labels=[];
+function mkLabel(text,cv,size=.55){const c=document.createElement('canvas');const tex=new THREE.CanvasTexture(c);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true}));sp.renderOrder=20;
+  sp.userData={text,cv,size,c,tex};drawLabel(sp);scene.add(sp);labels.push(sp);return sp;}
+function drawLabel(sp){const u=sp.userData,ctx=u.c.getContext('2d'),fs=64,font=`700 ${fs}px "Noto Sans TC","JetBrains Mono",sans-serif`;
+  ctx.font=font;const w=Math.ceil(ctx.measureText(u.text).width)+28;u.c.width=w;u.c.height=Math.round(fs*1.45);
+  ctx.font=font;ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=12;ctx.strokeStyle=cssv('--stage');ctx.strokeText(u.text,14,u.c.height/2);
+  ctx.fillStyle=cssv(u.cv);ctx.fillText(u.text,14,u.c.height/2);u.tex.needsUpdate=true;sp.scale.set(u.size*w/u.c.height,u.size,1);}
+function setLabel(sp,t,p){if(t!==sp.userData.text){sp.userData.text=t;drawLabel(sp);}if(p)sp.position.copy(p);sp.visible=true;}
+const lb=mkLabel('b','--bvec'),lxi=mkLabel('ξ','--line'),lbe=mkLabel('b 刃','--bvec',.42),lbs=mkLabel('b 螺','--bvec',.42);
+const lArc=[mkLabel('刃型','--ink',.45),mkLabel('混合型','--ink',.45),mkLabel('螺旋型','--ink',.45)];
+const lMove=mkLabel('移動方向','--circuit',.45),lTauT=mkLabel('τ','--ink'),lTauB=mkLabel('τ','--ink'),lStep=mkLabel('台階 = b','--ink',.45),lStep2=mkLabel('台階 = b','--ink',.45);
+const lA=mkLabel('A','--line'),lB=mkLabel('B','--line');
+const lS=mkLabel('S','--circuit'),lF=mkLabel('F','--circuit'),lCb=mkLabel('b','--bvec');
+
+const circMat=new THREE.MeshBasicMaterial({color:0x7c3aed,depthTest:false,transparent:true});
+const circSegs=[],circDots=[];
+for(let c=0;c<16;c++){const m=new THREE.Mesh(cylGeo,circMat);m.renderOrder=14;scene.add(m);circSegs.push(m);
+  const d=new THREE.Mesh(sphere,circMat);d.scale.setScalar(.11);d.renderOrder=14;scene.add(d);circDots.push(d);}
+
+function applyColors(){
+  renderer.setClearColor(new THREE.Color(cssv('--stage')),1);
+  cA.set(cssv('--atom'));cL.set(cssv('--atom-low'));cD.set(cssv('--distort'));
+  bondMat.color.set(cssv('--bond'));planeMat.color.set(cssv('--plane'));planeEdge.material.color.set(cssv('--plane'));
+  lineMat.color.set(cssv('--line'));matTop.color.set(cssv('--block-top'));matSide.color.set(cssv('--block-side'));gridMat.color.set(cssv('--block-grid'));circMat.color.set(cssv('--circuit'));
+  arrows.forEach(a=>a.userData.mat.color.set(cssv(a.userData.cv)));labels.forEach(drawLabel);dirty=true;drawWhy();
+}
+
+/* ---------- update ---------- */
+const dev=new Float32Array(M);
+const onSurf=n=>{const [i,j,k]=IJK[n];if(j===0||j===NY-1||k===0||k===NZ-1)return true;return i===0||i===NX-1;};
+const vis=n=>st.view==='top'?(IJK[n][1]===JL||IJK[n][1]===JU):(!st.surf||onSurf(n));
+function dist(a,b){const dx=pos[3*a]-pos[3*b],dy=pos[3*a+1]-pos[3*b+1],dz=pos[3*a+2]-pos[3*b+2];return Math.sqrt(dx*dx+dy*dy+dz*dz);}
+function updateAtoms(){
+  computeInto(pos,st.f);dev.fill(0);let c=0;
+  const put=(a,b)=>{bondPos.set([pos[3*a],pos[3*a+1],pos[3*a+2],pos[3*b],pos[3*b+1],pos[3*b+2]],c*6);c++;};
+  const ins=insertMode()&&st.f>=.5;
+  for(const [a,b] of (ins?insBonds:fixedBonds)){if(!vis(a)||!vis(b))continue;const d=Math.abs(dist(a,b)-1);if(d>dev[a])dev[a]=d;if(d>dev[b])dev[b]=d;put(a,b);}
+  if(ins){for(let i=0;i<NX;i++)for(let k=0;k<NZ;k++){const l=id(i,JL,k);let best=-1,bl=9;
+      for(let c=0;c<=NX;c++){const u=colId(c,JU,k),d=dist(u,l);if(d<bl){bl=d;best=u;}}
+      if(bl<1.3){const d=Math.abs(bl-1);if(d>dev[l])dev[l]=d;if(d>dev[best])dev[best]=d;if(vis(l)&&vis(best))put(best,l);}}}
+  else for(let i=0;i<NX;i++)for(let k=0;k<NZ;k++){const u=id(i,JU,k);let best=-1,bl=9;
+    for(let ii=i-1;ii<=i+1;ii++){if(ii<0||ii>=NX)continue;const l=id(ii,JL,k),d=dist(u,l);if(d<bl){bl=d;best=l;}}
+    if(best>=0&&bl<1.3){const d=Math.abs(bl-1);if(d>dev[u])dev[u]=d;if(d>dev[best])dev[best]=d;if(vis(u)&&vis(best))put(u,best);}}
+  bondGeo.setDrawRange(0,c*2);bondGeo.attributes.position.needsUpdate=true;bonds.visible=st.bonds;
+  const top=st.view==='top';
+  for(let n=0;n<M;n++){const j=IJK[n][1];let r=st.type==='screw'?.14:.2;if(!top&&!vis(n))r=0;if(top){r=j===JU?.25:j===JL?.17:0;}if(n>=N&&!ins)r=0;
+    dummy.position.set(pos[3*n],pos[3*n+1],pos[3*n+2]);dummy.scale.setScalar(r||1e-4);dummy.updateMatrix();atomMesh.setMatrixAt(n,dummy.matrix);
+    tmpC.copy((top&&j===JL)||(st.type==='screw'&&j<=JL)?cL:cA).lerp(cD,Math.min(1,dev[n]/.26));atomMesh.setColorAt(n,tmpC);}
+  atomMesh.instanceMatrix.needsUpdate=true;atomMesh.instanceColor.needsUpdate=true;atomMesh.visible=st.atoms;
+}
+function linePts(g){
+  if(g.arc){if(g.R<.3)return[];const p=[];for(let a=0;a<=60;a++){const ph=-Math.PI/2+Math.PI/2*a/60,x=ARC_C.x+g.R*Math.cos(ph),z=ARC_C.z+g.R*Math.sin(ph);
+    if(Math.abs(x)<=BX+1e-6&&Math.abs(z)<=BZ+1e-6)p.push(new V3(x,0,z));}return p.length>1?p:[];}
+  let t0=-1e9,t1=1e9;for(const [a,B] of [['x',BX],['z',BZ]]){const d=g.xi[a],p=g.p[a];
+    if(Math.abs(d)<1e-6){if(Math.abs(p)>B)return[];}else{const ta=(-B-p)/d,tb=(B-p)/d;t0=Math.max(t0,Math.min(ta,tb));t1=Math.min(t1,Math.max(ta,tb));}}
+  if(t1-t0<.3)return[];const P=t=>new V3(g.p.x+t*g.xi.x,0,g.p.z+t*g.xi.z);return[P(t0),P((t0+t1)/2),P(t1)];
+}
+const xiAt=(g,p)=>{if(!g.arc)return new V3(g.xi.x,0,g.xi.z);const m=new V3(p.x-ARC_C.x,0,p.z-ARC_C.z).normalize();return new V3(m.z,0,-m.x);};
+const mAt=(g,p)=>g.arc?new V3(p.x-ARC_C.x,0,p.z-ARC_C.z).normalize():new V3(g.m.x,0,g.m.z);
+function hideAll(){[bArrow,bE,bS,...arcB,moveArrow,tauTop,tauBot,closeArrow].forEach(a=>a.visible=false);labels.forEach(l=>l.visible=false);xiCones.forEach(c=>c.visible=false);}
+function updateLine(){
+  hideAll();const g=geom(),pts=linePts(g),showLine=!(st.mode==='circuit'&&st.f<.5);
+  tube.geometry.dispose();
+  if(pts.length&&showLine){const curve=new THREE.CatmullRomCurve3(pts);tube.geometry=new THREE.TubeGeometry(curve,g.arc?48:4,.075,10,false);tube.visible=true;
+    const L=curve.getLength(),nC=Math.max(1,Math.min(5,Math.round(L/2.6)));
+    for(let c=0;c<nC;c++){const u=(c+.5)/nC,p=curve.getPointAt(u),x=xiAt(g,p);xiCones[c].position.copy(p);xiCones[c].quaternion.setFromUnitVectors(UP,x);xiCones[c].visible=true;}
+    if(g.screw&&st.mode!=='slip'){setLabel(lA,'A',pts[pts.length-1].clone().add(new V3(-.55,0,0)));setLabel(lB,'B',pts[0].clone().add(new V3(.55,0,0)));}
+    const pe=curve.getPointAt(.93);setLabel(lxi,'ξ',pe.clone().add(new V3(0,-.75,0)));
+    const mid=curve.getPointAt(.5),bx=new V3(1,0,0);
+    if(!g.arc){const o=mid.clone().add(new V3(-.5,.8,0));if(st.mode!=='circuit'){setArrow(bArrow,o,bx);setLabel(lb,'b',o.clone().add(new V3(1.25,.2,0)));}
+      if(st.type==='mixed'&&st.comp&&st.mode==='structure'){const th=g.th,x=xiAt(g,mid),bs=x.clone().multiplyScalar(Math.cos(th)),be=bx.clone().sub(bs);
+        setArrow(bS,o,bs);setArrow(bE,o,be);if(bs.length()>.15)setLabel(lbs,'b 螺',o.clone().add(bs).add(new V3(0,.45,0)));if(be.length()>.15)setLabel(lbe,'b 刃',o.clone().add(be).add(new V3(0,.45,0)));}}
+    else{const names=['刃型','混合型','螺旋型'];[-10,-45,-80].forEach((deg,ix)=>{const ph=deg*Math.PI/180,p=new V3(ARC_C.x+g.R*Math.cos(ph),0,ARC_C.z+g.R*Math.sin(ph));
+      if(Math.abs(p.x)<=BX&&Math.abs(p.z)<=BZ){const o=p.clone().add(new V3(-.5,.8,0));setArrow(arcB[ix],o,bx);if(st.mode==='structure')setLabel(lArc[ix],names[ix],p.clone().add(new V3(0,1.65,0)));}});}
+    if(st.mode==='slip'&&st.slip>0&&st.slip<1){const m=mAt(g,mid),o=mid.clone().add(new V3(0,-.85,0));setArrow(moveArrow,o,m.clone().multiplyScalar(1.7));setLabel(lMove,'移動方向',o.clone().add(m.clone().multiplyScalar(2.1)).add(new V3(0,-.35,0)));}
+  }else tube.visible=false;
+  if(st.mode==='slip'){setArrow(tauTop,new V3(-2,3.35,0),new V3(4,0,0));setArrow(tauBot,new V3(2,-3.35,0),new V3(-4,0,0));
+    setLabel(lTauT,'τ',new V3(2.5,3.35,0));setLabel(lTauB,'τ',new V3(-2.5,-3.35,0));
+    if(st.slip>.97){setLabel(lStep,'台階 = b',new V3(BX+.9,.9,0));setLabel(lStep2,'台階 = b',new V3(-BX-.9,-.9,0));}}
+  const blk=st.style==='block'&&st.view!=='top';
+  plane.visible=planeEdge.visible=st.plane&&st.view!=='top'&&!blk;
+  lineMat.depthTest=!blk;lineMat.transparent=blk;
+  atomMesh.visible=st.atoms&&!blk;bonds.visible=st.bonds&&!blk;updateBlocks(blk);
+}
+
+/* ---------- Burgers circuit ---------- */
+const CIRC={edge:{start:[7,1,NZ-1],steps:[[-1,0,0,4],[0,1,0,3],[1,0,0,4],[0,-1,0,3]]},
+            screw:{start:[NX-1,1,2],steps:[[0,0,1,4],[0,1,0,3],[0,0,-1,4],[0,-1,0,3]]}};
+const circ={phase:'perfect',path:[],shown:0,timer:null};
+function walk(){const def=CIRC[st.type];if(!def)return[];const pf=circ.phase==='perfect'?0:1,arr=new Float32Array(M*3);computeInto(arr,pf);
+  const lim=insertMode()&&pf===1?M:N;
+  let cur=id(...def.start);const path=[cur];
+  for(const [dx,dy,dz,n] of def.steps)for(let s=0;s<n;s++){const tx=arr[3*cur]+dx,ty=arr[3*cur+1]+dy,tz=arr[3*cur+2]+dz;let best=-1,bd=1e9;
+    for(let a=0;a<lim;a++){if(a===cur)continue;const d=(arr[3*a]-tx)**2+(arr[3*a+1]-ty)**2+(arr[3*a+2]-tz)**2;if(d<bd){bd=d;best=a;}}cur=best;path.push(cur);}
+  return path;}
+const P3=n=>new V3(pos[3*n],pos[3*n+1],pos[3*n+2]);
+function updateCircuit(){
+  const on=st.mode==='circuit'&&!!CIRC[st.type];circSegs.forEach(s=>s.visible=false);circDots.forEach(s=>s.visible=false);if(!on)return;
+  const p=circ.path;for(let s=0;s<circ.shown&&s<p.length-1;s++){const a=P3(p[s]),b=P3(p[s+1]),v=b.clone().sub(a),L=v.length(),m=circSegs[s];
+    m.position.copy(a).addScaledVector(v,.5);m.quaternion.setFromUnitVectors(UP,v.normalize());m.scale.set(.05,L,.05);m.visible=true;}
+  for(let s=0;s<=circ.shown&&s<p.length;s++){circDots[s].position.copy(P3(p[s]));circDots[s].visible=true;}
+  const off=st.type==='edge'?new V3(-.35,-.45,.4):new V3(.4,-.45,.35);
+  setLabel(lS,'S',P3(p[0]).add(off));
+  const done=circ.shown>=p.length-1;
+  if(done){const F=P3(p[p.length-1]),S=P3(p[0]),v=S.clone().sub(F);
+    if(v.length()>.3){setLabel(lF,'F',F.clone().add(off));setArrow(closeArrow,F,v);setLabel(lCb,'b',F.clone().addScaledVector(v,.5).add(new V3(0,.5,0)));}}
+}
+function circStatus(){const el=$('#cStatus'),p=circ.path,n=p.length-1,s=circ.shown;
+  const dirs=st.type==='edge'?'往左 4 步 → 往上 3 步 → 往右 4 步 → 往下 3 步（正視圖，順時針）':'在晶體右側端面上：朝前（+z）走 4 步 → 往上 3 步 → 朝後（−z）走 4 步 → 往下 3 步（拇指指向 ξ，從右側看是順時針）';
+  if(circ.phase==='perfect'){
+    if(s===0)el.innerHTML=`<b>① 完美晶體</b>：從起點 S 出發，${dirs}。按「下一步」逐格前進。`;
+    else if(s<n)el.innerHTML=`第 <b>${s}</b> / ${n} 步`;
+    else el.innerHTML=`<b>回到起點，迴路閉合。</b>接著按「② 含差排晶體」，走完全相同的步數。`;
+  }else{
+    if(s===0)el.innerHTML=`<b>② 含差排晶體</b>：同樣從 S 出發，${dirs}。迴路要圈住差排線。`;
+    else if(s<n)el.innerHTML=`第 <b>${s}</b> / ${n} 步`;
+    else el.innerHTML=st.type==='edge'?`<b>迴路沒有閉合！</b>上半部多插入了一片原子面，上排走 4 步比下排少前進一格，所以終點 F 和起點 S 差了一格。由 F 指向 S 的藍色向量就是 <b>b</b>：長度一個原子間距，方向與差排線 ξ <b>垂直</b>。`
+      :`<b>迴路沒有閉合！</b>走完一圈後沿著差排線方向錯開了一格，迴路其實是一圈螺旋。由 F 指向 S 的藍色向量就是 <b>b</b>，方向與差排線 ξ <b>平行</b>。`;
+  }
+  $('#cStep').disabled=s>=n;$('#cPerfect').setAttribute('aria-pressed',circ.phase==='perfect');$('#cReal').setAttribute('aria-pressed',circ.phase==='real');
+  $('#cPerfect').classList.toggle('primary',false);
+}
+function circStart(phase){stopAuto();circ.phase=phase;st.fTarget=phase==='perfect'?0:1;if(reduce)st.f=st.fTarget;circ.path=walk();circ.shown=0;circStatus();dirty=true;}
+function circNext(){if(circ.shown<circ.path.length-1){circ.shown++;circStatus();dirty=true;}else stopAuto();}
+function stopAuto(){if(circ.timer){clearInterval(circ.timer);circ.timer=null;}$('#cAuto').textContent='自動播放';}
+$('#cPerfect').onclick=()=>circStart('perfect');$('#cReal').onclick=()=>circStart('real');
+$('#cStep').onclick=()=>{stopAuto();circNext();};$('#cReset').onclick=()=>circStart(circ.phase);
+$('#cAuto').onclick=()=>{if(circ.timer){stopAuto();return;}if(circ.shown>=circ.path.length-1)circ.shown=0;$('#cAuto').textContent='暫停';circ.timer=setInterval(circNext,450);};
+$$('[data-goto]').forEach(b=>b.onclick=()=>setType(b.dataset.goto));
+
+/* ---------- cameras & views ---------- */
+const CAM3D={edge:[7,6.5,14],screw:[-11,4.2,10.5],mixed:[9,10,12]};
+const OV={front:{p:[0,0,30],up:[0,1,0],w:6.4,h:4.4},side:{p:[30,0,0],up:[0,1,0],w:5.4,h:4.4},top:{p:[0,30,0],up:[0,0,-1],w:6.1,h:5.1}};
+function sizeCams(){const w=vp.clientWidth,h=vp.clientHeight,asp=w/h;renderer.setSize(w,h,false);persp.aspect=asp;persp.updateProjectionMatrix();
+  const o=OV[st.view];if(o){let hh=Math.max(o.h,o.w/asp);ortho.left=-hh*asp;ortho.right=hh*asp;ortho.top=hh;ortho.bottom=-hh;ortho.updateProjectionMatrix();}dirty=true;}
+function setView(v,keepPose){st.view=v;$$('#views button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===v));
+  if(controls)controls.dispose();
+  if(v==='3d'){cam=persp;if(!keepPose){persp.position.set(...(st.mode==='circuit'&&st.type==='screw'?[12,3.5,9]:CAM3D[st.type]));persp.up.set(0,1,0);const asp=vp.clientWidth/Math.max(1,vp.clientHeight);persp.position.multiplyScalar(Math.max(1,Math.min(2.2,1.35/asp)));}}
+  else{cam=ortho;const o=OV[v];ortho.position.set(...o.p);ortho.up.set(...o.up);ortho.zoom=1;}
+  cam.lookAt(0,0,0);controls=new THREE.OrbitControls(cam,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.12;controls.enableRotate=v==='3d';controls.target.set(0,0,0);
+  sizeCams();dirty=true;}
+const recView=()=>st.mode==='circuit'?(st.type==='screw'?'3d':'front'):(st.type==='edge'?'front':st.type==='screw'?'top':'top');
+function markRec(){const r=recView();$$('#views button').forEach(b=>b.classList.toggle('rec',b.dataset.view===r));
+  $('#viewNote').textContent=st.type==='edge'?'綠點是建議剖面：刃差排沿差排線看進去（正視）就是課本上的 ⊥ 圖。'
+   :st.type==='screw'?'3D 立體對應課本圖 4.4(a)；綠點的「俯視滑移面」對應圖 4.4(b)，可看到上下兩層原子逐漸錯開（大球為上層、小球為下層）。'
+   :'綠點是建議剖面：俯視滑移面可看出差排線哪一段是刃型、哪一段是螺旋型。';}
+$$('#views button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$('#resetView').onclick=()=>setView(st.view);$('#recView').onclick=()=>setView(recView());
+
+/* ---------- texts ---------- */
+const NAMES={edge:'刃差排',screw:'螺旋差排',mixed:'混合差排'};
+function structText(){
+  if(st.type==='edge')return'晶體中多插入了半片原子面，這半片原子面的下緣就是差排線 ξ。布格向量 b 與差排線互相垂直。差排附近的原子被擠壓或拉開，顏色越橘代表扭曲越大。';
+  if(st.type==='screw')return'和課本圖 4.4 相同：從晶體正面切入到差排線 AB，切口前方的上半部沿 b 方向錯開一個原子間距，下半部不動。所以左側面出現楔形缺口、右側面凸出一個台階，原子面繞著 AB 形成螺旋坡道。b 與差排線平行；切到「俯視滑移面」就是圖 4.4(b)（大球為上層、小球為下層）。';
+  return st.shape==='curved'?'真實的差排線常是彎曲的，但整條線的 b 都相同。b 與 ξ 垂直的地方是刃型，平行的地方是螺旋型，中間則是混合型。注意每個藍色 b 箭頭都指向同一個方向。'
+   :'混合差排可拆成刃分量 b·sin θ 和螺旋分量 b·cos θ。拖動滑桿改變 b 與差排線的夾角 θ：θ = 90° 就是刃差排，θ = 0° 就是螺旋差排。';}
+function slipText(){
+  if(st.type==='edge')return'上半晶體受到向右的剪應力。刃差排在滑移面上移動的方向與 b <b>平行</b>。';
+  if(st.type==='screw')return'施加同樣方向的剪應力，螺旋差排卻往<b>垂直</b> b 的方向移動。';
+  return isArc()?'差排環從角落向外擴張：每一段都沿著自身的法線方向往外移動，但整個區域滑移的量都是 b。':'直線混合差排沿著垂直於自身的方向移動，與 b 夾 90° − θ。';}
+function readout(){const th=thetaDeg();let rows;
+  const xi=st.type==='edge'?'[0 0 <span class="ob">1</span>]（指入畫面）':st.type==='screw'?'[<span class="ob">1</span> 0 0]（與 b 反平行，仍是 b ∥ ξ）':isArc()?'沿曲線逐點改變':`(cos θ, 0, −sin θ)`;
+  rows=[['布格向量 b','<span class="mono">a[1 0 0]</span>，|b| = a'],['差排線 ξ',`<span class="mono">${xi}</span>`],
+    ['b 與 ξ 夾角',isArc()?'90°（刃）→ 0°（螺旋）':`${th}°`],
+    ['滑移面',st.type==='screw'?'不唯一：任何包含 [1 0 0] 的面，可交滑移':'(0 1 0)，唯一'],
+    ['差排移動方向',st.type==='edge'?'∥ b（沿 x）':st.type==='screw'?'⊥ b（沿 −z，往晶體後方）':isArc()?'各點垂直差排線、向外擴張':`與 b 夾 ${90-th}°`]];
+  $('#readout').innerHTML=rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('');}
+function slipStatus(){const el=$('#pStatus'),s=st.slip;
+  if(s<=0.001)el.innerHTML='按「播放」施加剪應力 τ，差排會從晶體一側進入。';
+  else if(s<.97)el.innerHTML=st.type==='edge'?'差排線往 <b>+x</b> 移動，每次只有差排附近的一排鍵斷開再重新接上。'
+    :st.type==='screw'?'差排線從正面往 <b>−z</b> 移動（往晶體後方），已掃過的區域上半部錯開一個 b。':'差排線掃過的區域已經滑移，還沒掃到的區域保持原狀。';
+  else el.innerHTML='<b>差排離開晶體。</b>上半晶體相對下半晶體滑移了一個 b，在左右兩側表面留下一個原子間距的台階。'+(st.type!=='edge'?'結果和刃差排完全相同。':'');
+  $('#progVal').textContent=Math.round(s*100)+'%';$('#prog').value=Math.round(s*1000);$('#pPlay').textContent=st.playing?'❚❚ 暫停':'▶ 播放';}
+function refreshTexts(){
+  $('#sTitle').textContent=`${NAMES[st.type]} ${st.type==='edge'?'Edge':st.type==='screw'?'Screw':'Mixed'} dislocation`;
+  $('#sText').textContent=structText();$('#slipText').innerHTML=slipText();
+  $('#mixedCtl').hidden=st.type!=='mixed';$('#thetaCtl').hidden=!(st.type==='mixed'&&st.shape==='straight');
+  const th=st.theta*Math.PI/180;$('#thetaVal').textContent=st.theta+'°';$('#cEdge').textContent=Math.sin(th).toFixed(2)+' b';$('#cScrew').textContent=Math.cos(th).toFixed(2)+' b';
+  $('#circOK').hidden=st.type==='mixed';$('#circMixed').hidden=st.type!=='mixed';
+  $('#vpTag').textContent=`${NAMES[st.type]}・${st.mode==='structure'?'結構':st.mode==='circuit'?'布格迴路':'滑移模擬'}`;
+  readout();slipStatus();markRec();}
+
+/* ---------- controls ---------- */
+function setStyle(v){st.style=v;$$('#styles button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.style===v));dirty=true;}
+$$('#styles button').forEach(b=>b.onclick=()=>{st.styleTouched=true;setStyle(b.dataset.style);});
+function setType(t){st.type=t;if(!st.surfTouched){st.surf=t==='screw';$('#tSurf').checked=st.surf;}$$('.type-btn').forEach(b=>b.setAttribute('aria-pressed',b.dataset.type===t));
+  st.playing=false;st.slip=0;if(st.mode==='circuit'){if(t!=='mixed'){circStart('perfect');setView(recView());}else{stopAuto();st.fTarget=st.f=1;setView('3d');}}else setView(st.view==='3d'?'3d':recView());
+  refreshTexts();dirty=true;}
+function setMode(m){st.mode=m;$$('.modes button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
+  ['structure','circuit','slip'].forEach(k=>$('#pane-'+k).hidden=k!==m);
+  st.playing=false;stopAuto();
+  if(m==='circuit'&&st.type!=='mixed'){circStart('perfect');setView(recView());}else{st.fTarget=1;if(reduce)st.f=1;}
+  if(m==='slip'){st.slip=0;if(st.view!=='3d')setView('3d');}
+  refreshTexts();dirty=true;}
+$$('.type-btn').forEach(b=>b.onclick=()=>setType(b.dataset.type));
+$$('.modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$$('#shapes button').forEach(b=>b.onclick=()=>{st.shape=b.dataset.shape;$$('#shapes button').forEach(x=>x.setAttribute('aria-pressed',x===b));refreshTexts();dirty=true;});
+$('#theta').oninput=e=>{st.theta=+e.target.value;refreshTexts();dirty=true;};
+$('#tComp').onchange=e=>{st.comp=e.target.checked;dirty=true;};
+$('#tAtoms').onchange=e=>{st.atoms=e.target.checked;dirty=true;};
+$('#tBonds').onchange=e=>{st.bonds=e.target.checked;dirty=true;};
+$('#tSurf').onchange=e=>{st.surfTouched=true;st.surf=e.target.checked;dirty=true;};
+$('#tPlane').onchange=e=>{st.plane=e.target.checked;dirty=true;};
+$('#pPlay').onclick=()=>{if(st.slip>=1)st.slip=0;st.playing=!st.playing;slipStatus();dirty=true;};
+$('#pStep').onclick=()=>{st.playing=false;st.slip=Math.min(1,st.slip+1/40);slipStatus();dirty=true;};
+$('#pReset').onclick=()=>{st.playing=false;st.slip=0;slipStatus();dirty=true;};
+$('#prog').oninput=e=>{st.playing=false;st.slip=e.target.value/1000;slipStatus();dirty=true;};
+$('#speed').oninput=e=>{st.speed=+e.target.value;$('#speedVal').textContent=st.speed.toFixed(2).replace(/0$/,'')+'×';};
+
+/* ---------- loop ---------- */
+let last=performance.now();
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(Math.abs(st.f-st.fTarget)>1e-4){const d=st.fTarget-st.f;st.f+=Math.sign(d)*Math.min(Math.abs(d),dt*1.1);dirty=true;}
+  if(st.playing){st.slip=Math.min(1,st.slip+dt*st.speed/9);if(st.slip>=1)st.playing=false;slipStatus();dirty=true;}
+  if(dirty){updateAtoms();updateLine();updateCircuit();dirty=false;}
+  controls.update();renderer.render(scene,cam);requestAnimationFrame(frame);}
+new ResizeObserver(sizeCams).observe(vp);
+
+/* ---------- guide ---------- */
+const GUIDE=['在上方選擇差排種類：刃差排、螺旋差排或混合差排。','右側切換學習模式：看「結構」、走一圈「布格迴路」，或在「滑移模擬」施加剪應力。','在畫面上拖曳可旋轉晶體、滾輪縮放；下方按鈕可切換正視、側視、俯視剖面。'];
+let gi=0;function showGuide(){$('#gStep').textContent=`導覽 ${gi+1} / 3`;$('#gText').textContent=GUIDE[gi];$('#gNext').textContent=gi<2?'下一步':'開始使用';}
+const endGuide=()=>{$('#guide').hidden=true;store.set('dl-guide','1');};
+if(!store.get('dl-guide')){$('#guide').hidden=false;showGuide();}
+$('#gNext').onclick=()=>{if(gi<2){gi++;showGuide();}else endGuide();};$('#gSkip').onclick=endGuide;
+
+/* ---------- why: 2D comparison ---------- */
+const W={t:.45,playing:!reduce};
+const COLS=12;
+function whyU(kind,x,y,t){if(kind==='rigid')return Math.sign(y)*t/2;const x0=-9+18*t;return Math.atan2(y,x-x0)/(2*Math.PI);}
+function drawPanel(cv,kind){const dpr=Math.min(window.devicePixelRatio||1,2),w=cv.clientWidth,h=Math.round(w*.5);if(!w)return 0;
+  cv.width=w*dpr;cv.height=h*dpr;cv.style.height=h+'px';const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  const sp=w/(COLS+1.4),cx=w/2,cy=h/2,rows=[1.5,.5,-.5,-1.5],t=W.t;
+  const P=(i,y)=>{const x=i-(COLS-1)/2;return[cx+(x+whyU(kind,x,y,t))*sp,cy-y*sp*.95];};
+  ctx.fillStyle=cssv('--plane');ctx.globalAlpha=.25;ctx.fillRect(0,cy-2,w,4);ctx.globalAlpha=1;
+  ctx.lineWidth=1.5;ctx.strokeStyle=cssv('--bond');
+  for(const y of rows){for(let i=0;i<COLS-1;i++){const a=P(i,y),b=P(i+1,y);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();}}
+  for(let i=0;i<COLS;i++){[[1.5,.5],[-.5,-1.5]].forEach(([y1,y2])=>{const a=P(i,y1),b=P(i,y2);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke();});}
+  let bad=0;const hot=new Set();
+  for(let i=0;i<COLS;i++){const a=P(i,.5);let best=null,bd=1e9,bj=0;for(let j=Math.max(0,i-1);j<=Math.min(COLS-1,i+1);j++){const b=P(j,-.5),d=Math.abs(b[0]-a[0]);if(d<bd){bd=d;best=b;bj=j;}}
+    const mis=bd/sp,isBad=mis>.2;if(isBad){bad++;hot.add('u'+i);hot.add('l'+bj);}
+    ctx.strokeStyle=isBad?cssv('--distort'):cssv('--bond');ctx.lineWidth=isBad?3:1.5;ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...best);ctx.stroke();}
+  const r=sp*.26;
+  rows.forEach(y=>{for(let i=0;i<COLS;i++){const p=P(i,y),k=(y===.5?'u':y===-.5?'l':'x')+i;ctx.fillStyle=hot.has(k)?cssv('--distort'):cssv('--atom');ctx.beginPath();ctx.arc(p[0],p[1],r,0,7);ctx.fill();}});
+  if(kind==='disl'){const x0=-9+18*t;if(Math.abs(x0)<COLS/2){const X=cx+x0*sp;ctx.strokeStyle=cssv('--line');ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(X-9,cy+sp*.05);ctx.lineTo(X+9,cy+sp*.05);ctx.moveTo(X,cy+sp*.05);ctx.lineTo(X,cy-sp*.55);ctx.stroke();}}
+  ctx.fillStyle=cssv('--ink');ctx.font='600 13px "Noto Sans TC",sans-serif';ctx.fillText('τ →',8,16);ctx.fillText('← τ',w-36,h-8);
+  return bad;}
+function drawWhy(){const a=drawPanel($('#whyA'),'rigid'),b=drawPanel($('#whyB'),'disl');$('#wA').textContent=a;$('#wB').textContent=b;
+  $('#mA').style.width=(a/COLS*100)+'%';$('#mB').style.width=(b/COLS*100)+'%';$('#wProg').value=Math.round(W.t*1000);}
+let wl=performance.now();function whyLoop(now){const dt=Math.min(.05,(now-wl)/1000);wl=now;if(W.playing){W.t=(W.t+dt/7)%1;drawWhy();}requestAnimationFrame(whyLoop);}
+$('#wPlay').textContent=W.playing?'❚❚ 暫停':'▶ 播放';
+$('#wPlay').onclick=()=>{W.playing=!W.playing;$('#wPlay').textContent=W.playing?'❚❚ 暫停':'▶ 播放';};
+$('#wProg').oninput=e=>{W.playing=false;$('#wPlay').textContent='▶ 播放';W.t=e.target.value/1000;drawWhy();};
+new ResizeObserver(drawWhy).observe($('#why'));
+
+/* ---------- quiz ---------- */
+let qid=0;
+function qsvg(o){const u='q'+(qid++),P=(x,z)=>[150+18*x-9*z,92+9*z],f=p=>p.join(',');
+  const pl=[P(-4,-3),P(4,-3),P(4,3),P(-4,3)].map(f).join(' '),a=o.line*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+  const l1=P(-3*c,3*s),l2=P(3*c,-3*s),b1=P(1.2,-2.3),b2=P(3.6,-2.3);
+  let t=`<svg viewBox="0 0 300 165" role="img" aria-label="題目示意圖"><defs>
+  <marker id="${u}r" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--line)"/></marker>
+  <marker id="${u}b" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--bvec)"/></marker>
+  <marker id="${u}k" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--ink)"/></marker></defs>
+  <polygon points="${pl}" style="fill:var(--plane);fill-opacity:.16;stroke:var(--plane)" stroke-width="1.5"/>
+  <text x="${P(4,3)[0]-34}" y="${P(4,3)[1]+16}" font-size="11" style="fill:var(--plane)">滑移面</text>
+  <line x1="${l1[0]}" y1="${l1[1]}" x2="${l2[0]}" y2="${l2[1]}" style="stroke:var(--line)" stroke-width="4" marker-end="url(#${u}r)"/>
+  <text x="${l2[0]+6}" y="${l2[1]-4}" font-size="15" font-weight="700" style="fill:var(--line)">ξ</text>
+  <line x1="${b1[0]}" y1="${b1[1]}" x2="${b2[0]}" y2="${b2[1]}" style="stroke:var(--bvec)" stroke-width="3.5" marker-end="url(#${u}b)"/>
+  <text x="${b2[0]+6}" y="${b2[1]+5}" font-size="15" font-weight="700" style="fill:var(--bvec)">b</text>`;
+  if(o.tau)t+=`<line x1="100" y1="30" x2="200" y2="30" style="stroke:var(--ink)" stroke-width="2.5" marker-end="url(#${u}k)"/><text x="206" y="35" font-size="13" style="fill:var(--ink)">τ（上半晶體）</text>
+  <line x1="200" y1="150" x2="100" y2="150" style="stroke:var(--ink)" stroke-width="2.5" marker-end="url(#${u}k)"/><text x="12" y="155" font-size="13" style="fill:var(--ink)">τ（下半晶體）</text>`;
+  return t+'</svg>';}
+const QS=[
+ {q:'紅線是差排線 ξ，藍箭頭是布格向量 b，兩者都在滑移面上。這是哪一種差排？',svg:{line:90},o:['刃差排','螺旋差排','混合差排','不是差排'],a:0,e:'b 與差排線互相垂直，就是刃差排。'},
+ {q:'這條差排屬於哪一種？',svg:{line:0},o:['刃差排','螺旋差排','混合差排','部分差排'],a:1,e:'b 與差排線平行，就是螺旋差排。'},
+ {q:'b 與差排線的夾角是 45°，這是哪一種差排？',svg:{line:45},o:['刃差排','螺旋差排','混合差排','無法判斷'],a:2,e:'夾角介於 0° 和 90° 之間，是混合差排，可分解成刃分量和螺旋分量。'},
+ {q:'對這條刃差排施加圖示的剪應力，差排線會往哪個方向移動？',svg:{line:90,tau:true},o:['在滑移面內，與 b 平行','在滑移面內，與 b 垂直','垂直滑移面往上','不會移動'],a:0,e:'刃差排的移動方向與 b 平行。差排掃過之後，上半晶體相對下半晶體滑移一個 b。'},
+ {q:'施加同樣的剪應力，這條螺旋差排會往哪個方向移動？',svg:{line:0,tau:true},o:['在滑移面內，與 b 平行','在滑移面內，與 b 垂直','垂直滑移面往上','不會移動'],a:1,e:'螺旋差排的移動方向與 b 垂直。雖然方向不同，最後晶體的滑移量一樣是 b。'},
+ {q:'哪一種差排可以「交滑移」，從原本的滑移面換到另一個滑移面上？',o:['刃差排','螺旋差排','兩者都可以','兩者都不行'],a:1,e:'滑移面必須同時包含 b 和 ξ。螺旋差排的 b ∥ ξ，包含這條線的平面有無限多個，所以可以交滑移；刃差排的滑移面只有一個。'},
+ {q:'為什麼實際金屬的降伏強度遠低於理論計算值？',o:['金屬內有雜質降低了原子鍵強度','差排移動時一次只需打斷一排原子鍵','實驗時溫度太高','理論值的計算方式錯誤'],a:1,e:'理論值假設滑移面上所有鍵同時斷開；有差排時，原子鍵一次只斷開一排，就像推地毯上的皺褶。'},
+ {q:'一條混合差排的 b 與差排線夾 60°，它的刃分量大小約為？',o:['0.50 b','0.87 b','1.00 b','0.60 b'],a:1,e:'刃分量 = b·sin θ = b·sin 60° ≈ 0.87 b；螺旋分量 = b·cos 60° = 0.50 b。'}];
+let qi=0,score=0,answered=false;
+function renderQ(){const box=$('#quiz');
+  if(qi>=QS.length){box.innerHTML=`<div class="qtext">完成！你答對 <b>${score}</b> / ${QS.length} 題。</div><p>${score===QS.length?'全部答對，觀念很清楚。':'可以回到上方的 3D 模型，對照答錯的題目再看一次。'}</p><div class="btns"><button class="btn primary" id="qAgain">再做一次</button></div>`;
+    $('#qAgain').onclick=()=>{qi=0;score=0;renderQ();};return;}
+  const Q=QS[qi];answered=false;
+  box.innerHTML=`<div class="qhead"><span>第 ${qi+1} / ${QS.length} 題</span><span>答對 ${score}</span></div><div class="qtext">${Q.q}</div>${Q.svg?qsvg(Q.svg):''}
+  <div class="opts">${Q.o.map((t,i)=>`<button class="opt" data-i="${i}">${String.fromCharCode(65+i)}. ${t}</button>`).join('')}</div><div id="qx"></div>`;
+  $$('#quiz .opt').forEach(b=>b.onclick=()=>{if(answered)return;answered=true;const i=+b.dataset.i,ok=i===Q.a;if(ok)score++;
+    $$('#quiz .opt').forEach(x=>{x.disabled=true;if(+x.dataset.i===Q.a)x.classList.add('right');});if(!ok)b.classList.add('wrong');
+    $('#qx').innerHTML=`<p class="explain"><b class="${ok?'ok':'no'}">${ok?'答對了。':'再想想。'}</b>${Q.e}</p><div class="btns" style="margin-top:12px"><button class="btn primary" id="qNext">${qi<QS.length-1?'下一題':'看結果'}</button></div>`;
+    $('#qNext').onclick=()=>{qi++;renderQ();};});}
+
+/* ---------- init ---------- */
+setView('3d');refreshTexts();applyColors();renderQ();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyColors);
+new MutationObserver(applyColors).observe(root,{attributes:true,attributeFilter:['data-theme']});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{labels.forEach(drawLabel);drawWhy();});
+requestAnimationFrame(frame);requestAnimationFrame(whyLoop);
+})();
+</script>
+
+</body></html>
